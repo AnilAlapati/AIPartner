@@ -4,10 +4,24 @@ import { UserPersona, MatchResult, CandidateProfile } from "../types";
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Models configuration based on requirements
-const CHAT_MODEL = 'gemini-2.5-flash-lite'; // Fast low-latency responses
-const COMPLEX_MODEL = 'gemini-3-pro-preview'; // Deep reasoning/thinking
-const AUDIO_MODEL = 'gemini-2.5-flash'; // Audio transcription
+/**
+ * MULTI-MODEL STRATEGY (Cost Optimization)
+ * ----------------------------------------
+ * 1. Chatting: 'gemini-2.5-flash-lite' 
+ *    - Lowest latency, extremely cheap. Perfect for casual convo.
+ * 
+ * 2. Summarization: 'gemini-2.5-flash'
+ *    - Best value. Great at extracting data (JSON) and summarizing. 
+ *    - Does not need "thinking" time, saving $$$.
+ * 
+ * 3. Matching: 'gemini-3-pro-preview'
+ *    - The "Brain". Uses deep reasoning to find psychological matches.
+ *    - We spend the budget here where it counts.
+ */
+const CHAT_MODEL = 'gemini-2.5-flash-lite'; 
+const SUMMARIZATION_MODEL = 'gemini-2.5-flash'; 
+const MATCHING_MODEL = 'gemini-3-pro-preview'; 
+const AUDIO_MODEL = 'gemini-2.5-flash';
 
 export const createChatSession = (): Chat => {
   return ai.chats.create({
@@ -67,14 +81,13 @@ export const generateUserPersona = async (chatHistory: string[]): Promise<UserPe
     required: ['coreValues', 'hobbies', 'communicationStyle', 'idealPartnerTraits', 'summary'],
   };
 
+  // SWITCHED TO FLASH: Efficient for summarization, no thinking budget needed.
   const response = await ai.models.generateContent({
-    model: COMPLEX_MODEL,
+    model: SUMMARIZATION_MODEL,
     contents: prompt,
     config: {
       responseMimeType: "application/json",
       responseSchema: schema,
-      // Using max thinking budget for complex analysis
-      thinkingConfig: { thinkingBudget: 32768 } 
     }
   });
 
@@ -83,19 +96,55 @@ export const generateUserPersona = async (chatHistory: string[]): Promise<UserPe
   return JSON.parse(text) as UserPersona;
 };
 
-export const findMatches = async (userPersona: UserPersona, candidates: CandidateProfile[]): Promise<MatchResult[]> => {
+/**
+ * Pre-filters a large list of candidates to finding a subset likely to match.
+ * Simulates a Vector Database search using JavaScript keyword overlapping.
+ */
+const preFilterCandidates = (userPersona: UserPersona, allCandidates: CandidateProfile[], limit: number = 20): CandidateProfile[] => {
+  const scored = allCandidates.map(candidate => {
+    let score = 0;
+    
+    // Simple Keyword Matching (Heuristic)
+    const combinedCandidateText = [...candidate.interests, ...candidate.values].join(' ').toLowerCase();
+    
+    // Check overlapping interests
+    userPersona.hobbies.forEach(hobby => {
+      if (combinedCandidateText.includes(hobby.toLowerCase())) score += 2;
+    });
+
+    userPersona.coreValues.forEach(val => {
+      if (combinedCandidateText.includes(val.toLowerCase())) score += 3;
+    });
+    
+    // Random factor to ensure variety in the demo
+    score += Math.random() * 2; 
+
+    return { candidate, score };
+  });
+
+  // Sort by score desc and take top N
+  return scored.sort((a, b) => b.score - a.score).slice(0, limit).map(s => s.candidate);
+};
+
+export const findMatches = async (userPersona: UserPersona, allCandidates: CandidateProfile[]): Promise<MatchResult[]> => {
+  
+  // 1. FILTERING STEP (Simulate Vector DB)
+  // We can't send 1000 candidates to Gemini. It's too expensive and hits token limits.
+  // We pick the top 15 candidates based on a quick heuristic first.
+  const shortlistedCandidates = preFilterCandidates(userPersona, allCandidates, 15);
+
   const prompt = `I have a user with this persona:
   ${JSON.stringify(userPersona, null, 2)}
   
-  And these candidates:
-  ${JSON.stringify(candidates, null, 2)}
+  And these candidates (Shortlist):
+  ${JSON.stringify(shortlistedCandidates, null, 2)}
   
   Task:
   1. Rate the "Ship" potential (compatibility) from 0 to 100.
   2. Give a reasoning that sounds like a friend recommending a date (casual tone).
   3. List 3 key "Green Flags" (compatibility highlights).
   
-  Return JSON for ALL candidates.`;
+  Return JSON for ALL candidates provided.`;
 
   const schema: Schema = {
     type: Type.ARRAY,
@@ -111,14 +160,15 @@ export const findMatches = async (userPersona: UserPersona, candidates: Candidat
     }
   };
 
+  // KEEPING 3 PRO: Complex reasoning is required for good matches.
+  // Thinking Budget: 2048 (Optimized for balance between IQ and Cost)
   const response = await ai.models.generateContent({
-    model: COMPLEX_MODEL,
+    model: MATCHING_MODEL,
     contents: prompt,
     config: {
       responseMimeType: "application/json",
       responseSchema: schema,
-      // Using max thinking budget for complex matching logic
-      thinkingConfig: { thinkingBudget: 32768 } 
+      thinkingConfig: { thinkingBudget: 2048 } 
     }
   });
 
