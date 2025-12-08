@@ -1,5 +1,5 @@
 {
-  "name": "MyPartner",
+  "name": "VibeAI",
   "description": "A Gen Z focused, AI-driven dating experience that finds deep connections based on life experiences using Gemini 3.",
   "requestFramePermissions": [
     "microphone"

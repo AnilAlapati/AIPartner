@@ -1,23 +1,88 @@
-import React, { useState } from 'react';
-import { loginWithGoogle } from '../services/authService';
+import React, { useState, useEffect } from 'react';
+import { processGoogleCredential, loginAsDev } from '../services/authService';
 
 interface AuthPageProps {
   onLoginSuccess: () => void;
 }
 
-const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
-  const [isLoading, setIsLoading] = useState(false);
+declare global {
+  interface Window {
+    google: any;
+  }
+}
 
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    try {
-      await loginWithGoogle();
-      onLoginSuccess();
-    } catch (error) {
-      console.error("Login failed", error);
-    } finally {
-      setIsLoading(false);
+/**
+ * --- SETUP INSTRUCTIONS FOR PROJECT: vibeaipartner ---
+ * 
+ * 1. Go to Google Cloud Console: https://console.cloud.google.com/
+ * 2. Select your project "vibeaipartner".
+ * 3. Go to "APIs & Services" > "Credentials".
+ * 4. Click "+ CREATE CREDENTIALS" > "OAuth client ID".
+ * 5. Application type: "Web application".
+ * 6. Name: "VibeAI Frontend".
+ * 7. Authorized JavaScript origins: 
+ *    - Add the URL where this app is hosted (e.g., https://your-app-url.com or http://localhost:3000 for local dev).
+ * 8. Click "CREATE".
+ * 9. Copy the "Client ID" (it looks like "12345...apps.googleusercontent.com").
+ * 10. Paste it below in the `GOOGLE_CLIENT_ID` variable.
+ */
+
+const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"; 
+
+const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
+  const [error, setError] = useState<string | null>(null);
+  const [isHoveringDebug, setIsHoveringDebug] = useState(false);
+
+  useEffect(() => {
+    // Check if script is loaded
+    if (window.google && window.google.accounts) {
+        initializeGoogleAuth();
+    } else {
+        // Retry if script isn't ready yet
+        const timer = setTimeout(() => {
+            if (window.google && window.google.accounts) {
+                initializeGoogleAuth();
+            }
+        }, 500);
+        return () => clearTimeout(timer);
     }
+  }, []);
+
+  const initializeGoogleAuth = () => {
+    try {
+        window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: handleCredentialResponse,
+            theme: 'filled_black',
+            auto_select: false
+        });
+        
+        const btnDiv = document.getElementById("googleBtn");
+        if (btnDiv) {
+            window.google.accounts.id.renderButton(
+                btnDiv,
+                { theme: "filled_black", size: "large", width: "100%", shape: "pill", logo_alignment: "left" }
+            );
+        }
+    } catch (err) {
+        console.error("Google Auth Init Error", err);
+    }
+  };
+
+  const handleCredentialResponse = (response: any) => {
+    if (response.credential) {
+        const user = processGoogleCredential(response.credential);
+        if (user) {
+            onLoginSuccess();
+        } else {
+            setError("Unable to sign in. Please try again.");
+        }
+    }
+  };
+
+  const handleDevLogin = async () => {
+      await loginAsDev();
+      onLoginSuccess();
   };
 
   return (
@@ -38,49 +103,62 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
           <div className="mb-8 relative group">
             <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500 to-pink-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity"></div>
             <div className="relative w-20 h-20 bg-zinc-950 rounded-2xl flex items-center justify-center border border-white/10 shadow-xl">
-               <span className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-tr from-indigo-400 to-pink-400">M</span>
+               <span className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-tr from-indigo-400 to-pink-400">V</span>
             </div>
+            <div className="absolute -bottom-2 px-2 py-0.5 bg-zinc-800 rounded text-[8px] text-zinc-400 font-bold border border-white/5">BETA</div>
           </div>
 
           {/* Text */}
           <h1 className="text-4xl font-bold tracking-tight text-white mb-3">
-            MyPartner
+            VibeAI
           </h1>
           <p className="text-zinc-400 text-sm font-medium leading-relaxed mb-10 max-w-[260px]">
             The anti-dating app. <br/>
             AI matches you based on who you <span className="text-zinc-200 underline decoration-pink-500/50 underline-offset-2">actually are</span>.
           </p>
 
-          {/* Action */}
-          <button
-            onClick={handleGoogleLogin}
-            disabled={isLoading}
-            className="w-full py-4 px-6 bg-white hover:bg-zinc-200 text-black rounded-xl font-bold text-base transition-all transform active:scale-95 shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_-15px_rgba(255,255,255,0.5)] flex items-center justify-center gap-3 group"
-          >
-            {isLoading ? (
-               <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
-            ) : (
-              <>
-                <svg className="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                </svg>
-                <span>Continue with Google</span>
-              </>
-            )}
-          </button>
+          {/* Google Button Container */}
+          <div className="w-full h-[50px] flex items-center justify-center mb-4 min-h-[50px]">
+             {/* This div is where Google renders its button */}
+             <div id="googleBtn" className="w-full flex justify-center"></div>
+          </div>
+          
+          {error && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg w-full mb-4">
+                  <p className="text-red-400 text-xs">{error}</p>
+              </div>
+          )}
+
+          {GOOGLE_CLIENT_ID === "YOUR_GOOGLE_CLIENT_ID" && (
+             <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-left w-full">
+                 <p className="text-[10px] text-blue-200 font-mono">
+                     <strong>Project: vibeaipartner</strong><br/>
+                     Please generate an OAuth Client ID in Google Cloud Console and paste it in the code (AuthPage.tsx). Use Developer Mode below to test now.
+                 </p>
+             </div>
+          )}
 
           {/* Footer */}
-          <div className="mt-8 flex gap-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
-            <span>Privacy First</span>
+          <div className="mt-8 flex gap-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest cursor-default">
+            <span className="hover:text-zinc-400 transition-colors">Privacy</span>
             <span>•</span>
-            <span>No Swiping</span>
-            <span>•</span>
-            <span>Gemini 3</span>
+            <span className="hover:text-zinc-400 transition-colors">Terms</span>
           </div>
 
+        </div>
+
+        {/* Developer Bypass - Discreet for production demo */}
+        <div 
+            className="mt-8 text-center"
+            onMouseEnter={() => setIsHoveringDebug(true)}
+            onMouseLeave={() => setIsHoveringDebug(false)}
+        >
+            <button 
+                onClick={handleDevLogin}
+                className={`text-zinc-800 text-[10px] font-mono hover:text-zinc-500 transition-all duration-500 ${isHoveringDebug ? 'opacity-100' : 'opacity-20'}`}
+            >
+                [ Developer Bypass Mode ]
+            </button>
         </div>
 
         {/* Floating elements behind */}
