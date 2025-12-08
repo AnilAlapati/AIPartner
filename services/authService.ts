@@ -1,24 +1,47 @@
+import { UserProfile } from '../types';
 
-export interface UserProfile {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string;
-}
+// Helper to decode JWT without external libraries
+const parseJwt = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
 
-// Mocking backend interaction
-export const loginWithGoogle = async (): Promise<UserProfile> => {
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error("Failed to parse JWT", e);
+    return null;
+  }
+};
+
+export const processGoogleCredential = (credential: string): UserProfile | null => {
+  const payload = parseJwt(credential);
+  if (!payload) return null;
+
+  const user: UserProfile = {
+    id: payload.sub,
+    name: payload.name,
+    email: payload.email,
+    avatar: payload.picture
+  };
+
+  localStorage.setItem('mypartner_user', JSON.stringify(user));
+  return user;
+};
+
+// Fallback for Dev Mode
+export const loginAsDev = (): Promise<UserProfile> => {
   return new Promise((resolve) => {
-    setTimeout(() => {
-      const mockUser: UserProfile = {
-        id: 'user_' + Math.random().toString(36).substr(2, 9),
-        name: 'Alex Doe',
-        email: 'alex.doe@example.com',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex'
-      };
-      localStorage.setItem('mypartner_user', JSON.stringify(mockUser));
-      resolve(mockUser);
-    }, 1500); // Simulate network delay
+    const mockUser: UserProfile = {
+      id: 'dev_' + Math.random().toString(36).substr(2, 9),
+      name: 'Developer Mode',
+      email: 'dev@mypartner.ai',
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Dev'
+    };
+    localStorage.setItem('mypartner_user', JSON.stringify(mockUser));
+    resolve(mockUser);
   });
 };
 

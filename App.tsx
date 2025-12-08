@@ -157,9 +157,12 @@ const App: React.FC = () => {
         <header className="flex justify-between items-center mb-8 px-2">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.reload()}>
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white to-zinc-400 flex items-center justify-center shadow-lg shadow-white/10">
-                <span className="text-black font-bold text-lg">M</span>
+                <span className="text-black font-bold text-lg">V</span>
             </div>
-            <h1 className="text-xl font-bold tracking-tight">MyPartner</h1>
+            <div className="flex flex-col">
+                <h1 className="text-xl font-bold tracking-tight leading-none">VibeAI</h1>
+                <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Public Beta</span>
+            </div>
           </div>
           <div className="flex items-center gap-4">
              <button onClick={handleLogout} className="text-xs font-bold text-zinc-500 hover:text-white transition-colors">
@@ -177,7 +180,7 @@ const App: React.FC = () => {
           {step === 'landing' && (
             <div className="flex flex-col items-center justify-center text-center space-y-10 animate-fade-in-up py-10">
               <div className="space-y-6 max-w-3xl">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-zinc-300 mb-2 hover:bg-white/10 transition-colors">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-zinc-300 mb-2 hover:bg-white/10 transition-colors cursor-default">
                     <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_10px_rgba(74,222,128,0.5)]"></span>
                     AI-Native Dating • No Swiping
                 </div>
@@ -203,7 +206,7 @@ const App: React.FC = () => {
                             <button className="py-3.5 bg-zinc-100 text-black rounded-xl font-bold text-sm hover:bg-white hover:scale-[1.02] transition-all shadow-lg shadow-white/10">
                                 Male
                             </button>
-                            <button disabled className="py-3.5 bg-zinc-800/50 text-zinc-600 rounded-xl font-bold text-sm cursor-not-allowed border border-zinc-800">
+                            <button disabled className="py-3.5 bg-zinc-800/50 text-zinc-600 rounded-xl font-bold text-sm cursor-not-allowed border border-zinc-800 opacity-50">
                                 Female
                             </button>
                         </div>

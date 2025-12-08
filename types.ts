@@ -28,5 +28,12 @@ export interface MatchResult {
   compatibilityHighlights: string[];
 }
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+}
+
 export type AppStep = 'landing' | 'chat' | 'analyzing' | 'profile' | 'matches';
 export type Gender = 'Male' | 'Female' | 'Non-binary';
