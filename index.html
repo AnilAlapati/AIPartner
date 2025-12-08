@@ -3,19 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#09090b" />
-    <meta name="description" content="VibeAI - Find your actual vibe. No swiping, just deep connections powered by Gemini 3." />
-    <title>VibeAI | AI Vibe Check</title>
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="VibeAI - Digital Intimacy Protocol." />
+    <title>VibeAI | Vibe Check Protocol</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;800&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
+      :root {
+        --neon-lime: #ccff00;
+        --neon-purple: #b94dff;
+      }
       body {
-        font-family: 'Space Grotesk', sans-serif;
-        background-color: #09090b;
+        font-family: 'JetBrains Mono', monospace;
+        background-color: #030303;
         color: #e4e4e7;
         overflow-x: hidden;
       }
+      h1, h2, h3, .font-display {
+        font-family: 'Syne', sans-serif;
+      }
+      
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -23,31 +33,96 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
+      
       .glass {
         background: rgba(255, 255, 255, 0.02);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
       }
-      @keyframes fade-in-up {
-        from {
-          opacity: 0;
-          transform: translateY(20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+
+      /* CRT Scanline Effect */
+      .scanlines {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: linear-gradient(
+          to bottom,
+          rgba(255,255,255,0),
+          rgba(255,255,255,0) 50%,
+          rgba(0,0,0,0.2) 50%,
+          rgba(0,0,0,0.2)
+        );
+        background-size: 100% 4px;
+        z-index: 50;
+        pointer-events: none;
+        opacity: 0.15;
       }
-      .animate-fade-in-up {
-        animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+      /* Liquid Gradient Blob */
+      .blob {
+        position: absolute;
+        filter: blur(80px);
+        z-index: -1;
+        opacity: 0.6;
+        animation: float 10s infinite alternate;
       }
-      @keyframes fade-in {
-        from { opacity: 0; }
-        to { opacity: 1; }
+      @keyframes float {
+        0% { transform: translate(0, 0) scale(1); }
+        100% { transform: translate(20px, -20px) scale(1.1); }
       }
-      .animate-fade-in {
-        animation: fade-in 0.5s ease-out forwards;
+
+      /* Glitch Text */
+      .glitch {
+        position: relative;
+      }
+      .glitch::before,
+      .glitch::after {
+        content: attr(data-text);
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #030303;
+      }
+      .glitch::before {
+        left: 2px;
+        text-shadow: -1px 0 #ff00c1;
+        clip: rect(44px, 450px, 56px, 0);
+        animation: glitch-anim 5s infinite linear alternate-reverse;
+      }
+      .glitch::after {
+        left: -2px;
+        text-shadow: -1px 0 #00fff9;
+        clip: rect(44px, 450px, 56px, 0);
+        animation: glitch-anim2 5s infinite linear alternate-reverse;
+      }
+      @keyframes glitch-anim {
+        0% { clip: rect(10px, 9999px, 30px, 0); }
+        5% { clip: rect(70px, 9999px, 90px, 0); }
+        10% { clip: rect(20px, 9999px, 50px, 0); }
+        100% { clip: rect(0, 0, 0, 0); }
+      }
+      @keyframes glitch-anim2 {
+        0% { clip: rect(80px, 9999px, 100px, 0); }
+        5% { clip: rect(10px, 9999px, 40px, 0); }
+        10% { clip: rect(50px, 9999px, 80px, 0); }
+        100% { clip: rect(0, 0, 0, 0); }
+      }
+      
+      .text-outline {
+        -webkit-text-stroke: 1px rgba(255, 255, 255, 0.3);
+        color: transparent;
+      }
+      
+      /* Brutalist Border Grid */
+      .grid-lines {
+        background-size: 40px 40px;
+        background-image:
+          linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
       }
     </style>
   <script type="importmap">

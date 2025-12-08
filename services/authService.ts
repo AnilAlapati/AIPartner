@@ -1,3 +1,4 @@
+
 import { UserProfile } from '../types';
 
 // Helper to decode JWT without external libraries
@@ -46,7 +47,13 @@ export const loginAsDev = (): Promise<UserProfile> => {
 };
 
 export const logout = () => {
+  // Clear user auth
   localStorage.removeItem('mypartner_user');
+  // Clear app state to prevent stale data on re-login
+  localStorage.removeItem('vibeai_step');
+  localStorage.removeItem('vibeai_chat');
+  localStorage.removeItem('vibeai_persona');
+  localStorage.removeItem('vibeai_matches');
 };
 
 export const getCurrentUser = (): UserProfile | null => {

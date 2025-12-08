@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Message } from '../types';
 import { transcribeAudio } from '../services/geminiService';
@@ -122,6 +123,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const progressPercentage = Math.min((currentStep / totalSteps) * 100, 100);
+  const hasMessages = messages.filter(m => m.role === 'user').length > 0;
 
   return (
     <div className="flex flex-col h-[85vh] md:h-[800px] w-full max-w-2xl mx-auto glass rounded-[2rem] overflow-hidden shadow-2xl border border-white/10 animate-fade-in-up">
@@ -144,7 +146,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
             <button 
                 onClick={onFinish}
-                className="text-xs font-medium text-zinc-400 hover:text-white transition-colors underline decoration-zinc-700 underline-offset-4"
+                disabled={!hasMessages}
+                className={`text-xs font-medium transition-colors underline decoration-zinc-700 underline-offset-4 ${
+                    !hasMessages ? 'text-zinc-600 cursor-not-allowed' : 'text-zinc-400 hover:text-white'
+                }`}
             >
                 Skip to results
             </button>

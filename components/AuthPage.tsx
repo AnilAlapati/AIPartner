@@ -12,22 +12,23 @@ declare global {
 }
 
 /**
- * --- SETUP INSTRUCTIONS FOR PROJECT: vibeaipartner ---
+ * --- SETUP INSTRUCTIONS FOR DOMAIN: AgentPandu.com ---
+ * 
+ * To make Google Sign-In work on your domain:
  * 
  * 1. Go to Google Cloud Console: https://console.cloud.google.com/
- * 2. Select your project "vibeaipartner".
+ * 2. Select project "vibeaipartner".
  * 3. Go to "APIs & Services" > "Credentials".
- * 4. Click "+ CREATE CREDENTIALS" > "OAuth client ID".
- * 5. Application type: "Web application".
- * 6. Name: "VibeAI Frontend".
- * 7. Authorized JavaScript origins: 
- *    - Add the URL where this app is hosted (e.g., https://your-app-url.com or http://localhost:3000 for local dev).
- * 8. Click "CREATE".
- * 9. Copy the "Client ID" (it looks like "12345...apps.googleusercontent.com").
- * 10. Paste it below in the `GOOGLE_CLIENT_ID` variable.
+ * 4. Click the Pencil icon to edit your OAuth 2.0 Client ID.
+ * 5. Under "Authorized JavaScript origins", YOU MUST ADD:
+ *    - https://agentpandu.com
+ *    - https://www.agentpandu.com
+ *    - http://localhost:3000 (Keep this for local testing)
+ * 
+ * Note: It may take 5-10 minutes for Google to recognize the new domain after saving.
  */
 
-const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"; 
+const GOOGLE_CLIENT_ID = "736838018216-09125e2g5vm6d3u1uah5u6ocv8f8p499.apps.googleusercontent.com"; 
 
 const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState<string | null>(null);
@@ -127,15 +128,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
               <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg w-full mb-4">
                   <p className="text-red-400 text-xs">{error}</p>
               </div>
-          )}
-
-          {GOOGLE_CLIENT_ID === "YOUR_GOOGLE_CLIENT_ID" && (
-             <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-left w-full">
-                 <p className="text-[10px] text-blue-200 font-mono">
-                     <strong>Project: vibeaipartner</strong><br/>
-                     Please generate an OAuth Client ID in Google Cloud Console and paste it in the code (AuthPage.tsx). Use Developer Mode below to test now.
-                 </p>
-             </div>
           )}
 
           {/* Footer */}
