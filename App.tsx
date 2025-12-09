@@ -14,6 +14,7 @@ import {
   findMatches,
 } from "./services/geminiService";
 import { getCurrentUser, logout } from "./services/authService";
+import { initGA, analytics } from "./services/analytics";
 import ChatInterface from "./components/ChatInterface";
 import MatchCard from "./components/MatchCard";
 import Loader from "./components/Loader";
@@ -22,6 +23,11 @@ import AuthPage from "./components/AuthPage";
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Initialize Google Analytics
+  useEffect(() => {
+    initGA();
+  }, []);
 
   // Initialize state from localStorage if available
   const [step, setStep] = useState<AppStep>(() => {
@@ -127,6 +133,7 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
+    analytics.userLogout();
     logout();
     handleReset();
     setIsAuthenticated(false);
@@ -135,6 +142,7 @@ const App: React.FC = () => {
   const handleSendMessage = async (text: string) => {
     if (!chatSessionRef.current) return;
 
+    analytics.chatMessageSent();
     const newHistory = [...chatHistory, { role: "user", text } as Message];
     setChatHistory(newHistory);
 
@@ -185,6 +193,7 @@ const App: React.FC = () => {
         (m) => `${m.role.toUpperCase()}: ${m.text}`
       );
       const persona = await generateUserPersona(conversationText);
+      analytics.personaGenerated();
       setUserPersona(persona);
       setStep("profile");
     } catch (error) {
@@ -197,6 +206,7 @@ const App: React.FC = () => {
   const handleFindMatches = async () => {
     if (!userPersona) return;
 
+    analytics.matchingStarted();
     setStep("analyzing");
     setLoadingText("Scanning the universe for matches...");
 
@@ -225,7 +235,12 @@ const App: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-[#030303] text-zinc-100">
-        <AuthPage onLoginSuccess={() => setIsAuthenticated(true)} />
+        <AuthPage
+          onLoginSuccess={() => {
+            analytics.userLogin("google");
+            setIsAuthenticated(true);
+          }}
+        />
       </div>
     );
   }
@@ -281,12 +296,12 @@ const App: React.FC = () => {
                   </div>
                   <h1
                     className="text-5xl md:text-7xl lg:text-[10rem] font-display font-black leading-[0.85] tracking-tighter text-white uppercase glitch"
-                    data-text="DEATH TO SMALL TALK"
+                    data-text="WHERE STORIES CONNECT SOULS"
                   >
-                    DEATH TO <br />
-                    <span className="text-outline">SMALL</span> <br />
+                    WHERE <br />
+                    <span className="text-outline">STORIES</span> <br />
                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#ccff00] via-pink-500 to-purple-500">
-                      TALK
+                      CONNECT SOULS
                     </span>
                   </h1>
                 </div>
@@ -316,16 +331,6 @@ const App: React.FC = () => {
                       Start Vibe Check
                     </span>
                     <div className="absolute inset-0 bg-white translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
-                  </button>
-                  <button className="px-8 py-5 border border-white/20 text-white font-mono text-sm uppercase tracking-widest hover:bg-white/5 transition-all flex items-center gap-3">
-                    <svg
-                      className="w-4 h-4"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                    Watch Demo
                   </button>
                 </div>
 
@@ -364,26 +369,6 @@ const App: React.FC = () => {
                     </p>
                   </div>
                 </div>
-              </div>
-
-              {/* Scroll Indicator */}
-              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce">
-                <span className="font-mono text-[10px] text-zinc-500">
-                  SCROLL_DOWN
-                </span>
-                <svg
-                  className="w-6 h-6 text-zinc-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                  />
-                </svg>
               </div>
             </section>
 

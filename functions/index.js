@@ -8,21 +8,34 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
+// Request logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[${req.method}] ${req.path} - ${res.statusCode} - ${duration}ms`);
+  });
+  next();
+});
+
 // Initialize Gemini
 // CRITICAL: Ensure you set this via: firebase functions:config:set gemini.key="YOUR_KEY"
 const apiKey = functions.config().gemini?.key || process.env.API_KEY;
+console.log("Gemini API Key configured:", !!apiKey);
 const ai = new GoogleGenAI({ apiKey: apiKey });
 
 // --- MODELS STRATEGY ---
-const CHAT_MODEL = 'gemini-2.5-flash-lite';
+const CHAT_MODEL = 'gemini-3-pro-preview';
 const SUMMARIZATION_MODEL = 'gemini-2.5-flash';
 const MATCHING_MODEL = 'gemini-3-pro-preview';
 const AUDIO_MODEL = 'gemini-2.5-flash';
 
 // 1. CHAT ENDPOINT
 app.post("/chat", async (req, res) => {
+  const startTime = Date.now();
   try {
     const { history, message } = req.body;
+    console.log(`Chat request - History length: ${history?.length || 0}, Message length: ${message?.length || 0}`);
     
     // Construct the chat session statefully on the backend
     const chat = ai.chats.create({
@@ -40,10 +53,12 @@ app.post("/chat", async (req, res) => {
     });
 
     const result = await chat.sendMessage({ message });
+    const duration = Date.now() - startTime;
+    console.log(`Chat response generated in ${duration}ms - Response length: ${result.text?.length || 0}`);
     res.json({ text: result.text });
 
   } catch (error) {
-    console.error("Chat Error:", error);
+    console.error("Chat Error:", error.message, { stack: error.stack, historyLength: req.body.history?.length });
     res.status(500).json({ error: error.message });
   }
 });
@@ -86,7 +101,7 @@ app.post("/persona", async (req, res) => {
     res.json(JSON.parse(response.text));
 
   } catch (error) {
-    console.error("Persona Error:", error);
+    console.error("Persona Error:", error.message, { stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -136,7 +151,7 @@ app.post("/match", async (req, res) => {
     res.json(JSON.parse(response.text));
 
   } catch (error) {
-    console.error("Match Error:", error);
+    console.error("Match Error:", error.message, { stack: error.stack, candidatesCount: req.body.candidates?.length });
     res.status(500).json({ error: error.message });
   }
 });
@@ -158,7 +173,7 @@ app.post("/transcribe", async (req, res) => {
 
     res.json({ text: response.text });
   } catch (error) {
-    console.error("Transcription Error:", error);
+    console.error("Transcription Error:", error.message, { stack: error.stack, mimeType: req.body.mimeType });
     res.status(500).json({ error: error.message });
   }
 });
