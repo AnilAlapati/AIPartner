@@ -1,4 +1,5 @@
 import { UserPersona, MatchResult, CandidateProfile, Message } from "../types";
+import { getCurrentUser } from "./authService";
 
 // Determine API Base URL
 // If in development (localhost), we assume the rewrite works locally via `firebase hosting:start` 
@@ -23,16 +24,23 @@ class BackendChatSession {
     this.history.push({ role: 'user', parts: [{ text: message }] });
 
     try {
+      const user = getCurrentUser();
       const response = await fetch(`${API_BASE}/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || 'anonymous'
+        },
         body: JSON.stringify({
           history: this.history, // Send full history for context
           message: message
         })
       });
 
-      if (!response.ok) throw new Error('Backend API Error');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Backend API Error');
+      }
       
       const data = await response.json();
       const modelText = data.text || "";

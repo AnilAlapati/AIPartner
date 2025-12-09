@@ -2,6 +2,12 @@ const functions = require("firebase-functions");
 const { GoogleGenAI } = require("@google/genai");
 const express = require("express");
 const cors = require("cors");
+const admin = require("firebase-admin");
+const config = require("./config");
+
+// Initialize Firebase Admin
+admin.initializeApp();
+const db = admin.firestore();
 
 // Initialize Express App for API routing
 const app = express();
@@ -29,6 +35,91 @@ const CHAT_MODEL = 'gemini-3-pro-preview';
 const SUMMARIZATION_MODEL = 'gemini-2.5-flash';
 const MATCHING_MODEL = 'gemini-3-pro-preview';
 const AUDIO_MODEL = 'gemini-2.5-flash';
+
+// --- USER SESSION MANAGEMENT ---
+const checkAndRegisterUser = async (userId) => {
+  try {
+    const usersRef = db.collection('activeUsers');
+    const snapshot = await usersRef.get();
+    const activeUserCount = snapshot.size;
+
+    // Check if user already has an active session
+    const userDoc = await usersRef.doc(userId).get();
+    if (userDoc.exists) {
+      // User already registered, just update last active time
+      await usersRef.doc(userId).update({
+        lastActive: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return { allowed: true, message: 'User already in session' };
+    }
+
+    // Check if we're at capacity
+    if (activeUserCount >= config.MAX_ACTIVE_USERS) {
+      return { 
+        allowed: false, 
+        message: `At maximum capacity (${config.MAX_ACTIVE_USERS} users). Please try again later.`,
+        activeUsers: activeUserCount
+      };
+    }
+
+    // Register new user
+    await usersRef.doc(userId).set({
+      userId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastActive: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { 
+      allowed: true, 
+      message: 'User registered', 
+      activeUsers: activeUserCount + 1 
+    };
+  } catch (error) {
+    console.error('User registration error:', error);
+    // Allow on error to not block users due to DB issues
+    return { allowed: true, message: 'Registration check skipped due to error' };
+  }
+};
+
+// Cleanup old sessions (runs on each request)
+const cleanupOldSessions = async () => {
+  try {
+    const timeoutMinutes = config.SESSION_TIMEOUT_MINUTES;
+    const cutoffTime = new Date(Date.now() - timeoutMinutes * 60 * 1000);
+    
+    const usersRef = db.collection('activeUsers');
+    const oldSessions = await usersRef.where('lastActive', '<', cutoffTime).get();
+    
+    const batch = db.batch();
+    oldSessions.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    if (oldSessions.size > 0) {
+      await batch.commit();
+      console.log(`Cleaned up ${oldSessions.size} expired sessions`);
+    }
+  } catch (error) {
+    console.error('Cleanup error:', error);
+  }
+};
+
+// Middleware to check user limit before processing requests
+app.use(async (req, res, next) => {
+  const userId = req.headers['x-user-id'];
+  if (userId && (req.path === '/chat' || req.path === '/persona' || req.path === '/matches')) {
+    const registration = await checkAndRegisterUser(userId);
+    if (!registration.allowed) {
+      return res.status(429).json({ 
+        error: registration.message,
+        retryAfter: 60 
+      });
+    }
+    // Cleanup expired sessions in background
+    cleanupOldSessions().catch(err => console.error('Cleanup failed:', err));
+  }
+  next()
+});
 
 // 1. CHAT ENDPOINT
 app.post("/chat", async (req, res) => {
