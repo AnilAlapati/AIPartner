@@ -3,11 +3,48 @@ const { GoogleGenAI } = require("@google/genai");
 const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
-const config = require("./config");
+const localConfig = require("./config");
 
 // Initialize Firebase Admin
 admin.initializeApp();
 const db = admin.firestore();
+
+// Cache for settings to avoid reading Firestore on every request
+let cachedSettings = null;
+let settingsCacheTime = 0;
+const CACHE_DURATION = 60000; // Cache for 60 seconds
+
+// Get settings from Firestore or cache
+const getSettings = async () => {
+  const now = Date.now();
+  
+  // Return cached settings if still valid
+  if (cachedSettings && (now - settingsCacheTime) < CACHE_DURATION) {
+    return cachedSettings;
+  }
+
+  try {
+    const settingsDoc = await db.collection('config').doc('limits').get();
+    if (settingsDoc.exists) {
+      cachedSettings = settingsDoc.data();
+      settingsCacheTime = now;
+      return cachedSettings;
+    } else {
+      // Initialize if not exists
+      console.log('Initializing default settings in Firestore...');
+      await db.collection('config').doc('limits').set(localConfig);
+      cachedSettings = localConfig;
+      settingsCacheTime = now;
+      return cachedSettings;
+    }
+  } catch (error) {
+    console.error('Error fetching settings from Firestore:', error);
+  }
+
+  // Fall back to local config if Firestore read fails
+  console.log('Using fallback config');
+  return localConfig;
+};
 
 // Initialize Express App for API routing
 const app = express();
@@ -31,7 +68,8 @@ console.log("Gemini API Key configured:", !!apiKey);
 const ai = new GoogleGenAI({ apiKey: apiKey });
 
 // --- MODELS STRATEGY ---
-const CHAT_MODEL = 'gemini-3-pro-preview';
+// Reverted to Gemini 3 for maximum reasoning capability & branding
+const CHAT_MODEL = 'gemini-3-pro-preview'; 
 const SUMMARIZATION_MODEL = 'gemini-2.5-flash';
 const MATCHING_MODEL = 'gemini-3-pro-preview';
 const AUDIO_MODEL = 'gemini-2.5-flash';
@@ -39,6 +77,7 @@ const AUDIO_MODEL = 'gemini-2.5-flash';
 // --- USER SESSION MANAGEMENT ---
 const checkAndRegisterUser = async (userId) => {
   try {
+    const settings = await getSettings();
     const usersRef = db.collection('activeUsers');
     const snapshot = await usersRef.get();
     const activeUserCount = snapshot.size;
@@ -54,10 +93,10 @@ const checkAndRegisterUser = async (userId) => {
     }
 
     // Check if we're at capacity
-    if (activeUserCount >= config.MAX_ACTIVE_USERS) {
+    if (activeUserCount >= settings.MAX_ACTIVE_USERS) {
       return { 
         allowed: false, 
-        message: `At maximum capacity (${config.MAX_ACTIVE_USERS} users). Please try again later.`,
+        message: `At maximum capacity (${settings.MAX_ACTIVE_USERS} users). Please try again later.`,
         activeUsers: activeUserCount
       };
     }
@@ -84,7 +123,8 @@ const checkAndRegisterUser = async (userId) => {
 // Cleanup old sessions (runs on each request)
 const cleanupOldSessions = async () => {
   try {
-    const timeoutMinutes = config.SESSION_TIMEOUT_MINUTES;
+    const settings = await getSettings();
+    const timeoutMinutes = settings.SESSION_TIMEOUT_MINUTES;
     const cutoffTime = new Date(Date.now() - timeoutMinutes * 60 * 1000);
     
     const usersRef = db.collection('activeUsers');
@@ -107,7 +147,9 @@ const cleanupOldSessions = async () => {
 // Middleware to check user limit before processing requests
 app.use(async (req, res, next) => {
   const userId = req.headers['x-user-id'];
-  if (userId && (req.path === '/chat' || req.path === '/persona' || req.path === '/matches')) {
+  const path = req.path;
+  // Check for paths with or without /api prefix
+  if (userId && (path.endsWith('/chat') || path.endsWith('/persona') || path.endsWith('/match'))) {
     const registration = await checkAndRegisterUser(userId);
     if (!registration.allowed) {
       return res.status(429).json({ 
@@ -122,10 +164,13 @@ app.use(async (req, res, next) => {
 });
 
 // 1. CHAT ENDPOINT
-app.post("/chat", async (req, res) => {
+app.post(["/chat", "/api/chat"], async (req, res) => {
   const startTime = Date.now();
   try {
     const { history, message } = req.body;
+    const settings = await getSettings();
+    const maxWords = settings.MAX_CHAT_RESPONSE_WORDS || 20;
+
     console.log(`Chat request - History length: ${history?.length || 0}, Message length: ${message?.length || 0}`);
     
     // Construct the chat session statefully on the backend
@@ -139,7 +184,8 @@ app.post("/chat", async (req, res) => {
         Be low-key, conversational, and use lower-case often. Use slang appropriately (e.g., "no cap", "bet", "vibes", "aesthetic").
         Ask ONE question at a time.
         Start by asking for their name and a quick "lore drop" (a defining life moment).
-        Dig deeper into their answers naturally.`,
+        Dig deeper into their answers naturally.
+        IMPORTANT: Keep your responses VERY SHORT (max ${maxWords} words). Be punchy.`,
       },
     });
 
@@ -155,7 +201,7 @@ app.post("/chat", async (req, res) => {
 });
 
 // 2. PERSONA ANALYSIS ENDPOINT
-app.post("/persona", async (req, res) => {
+app.post(["/persona", "/api/persona"], async (req, res) => {
   try {
     const { history } = req.body; // Array of strings ["USER: hi", "MODEL: hello"]
     
@@ -198,7 +244,7 @@ app.post("/persona", async (req, res) => {
 });
 
 // 3. MATCHING ENDPOINT
-app.post("/match", async (req, res) => {
+app.post(["/match", "/api/match"], async (req, res) => {
   try {
     const { userPersona, candidates } = req.body;
 
@@ -248,7 +294,7 @@ app.post("/match", async (req, res) => {
 });
 
 // 4. TRANSCRIPTION ENDPOINT
-app.post("/transcribe", async (req, res) => {
+app.post(["/transcribe", "/api/transcribe"], async (req, res) => {
   try {
     const { audio, mimeType } = req.body;
     

@@ -10,8 +10,12 @@ module.exports = {
   
   // Chat Settings
   MAX_CHAT_MESSAGES: 5,  // Maximum messages per user session
+  MAX_CHAT_RESPONSE_WORDS: 20, // Max words per AI response
   
   // Matching
   CANDIDATE_POOL_SIZE: 500,  // Total candidates to generate
   MATCHES_TO_RETURN: 20,  // Top N matches to return
+  
+  // Profile Source Switch
+  USE_GENERATED_PROFILES: true,  // Set to false to use original hardcoded profiles (mockProfiles.ts)
 };

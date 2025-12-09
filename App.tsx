@@ -8,6 +8,7 @@ import {
   CandidateProfile,
 } from "./types";
 import { generateCandidates } from "./data/profileGenerator";
+import { FEMALE_CANDIDATES } from "./data/mockProfiles";
 import {
   createChatSession,
   generateUserPersona,
@@ -52,9 +53,13 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [candidatesPool] = useState<CandidateProfile[]>(() =>
-    generateCandidates(500, "Female")
-  );
+  // Determine which candidate pool to use
+  // By default, uses generated profiles (500 randomized)
+  // Set USE_GENERATED_PROFILES to false in config to use original mockProfiles
+  const [candidatesPool] = useState<CandidateProfile[]>(() => {
+    const useGenerated = true; // Set to false to use FEMALE_CANDIDATES from mockProfiles.ts
+    return useGenerated ? generateCandidates(500, "Female") : FEMALE_CANDIDATES;
+  });
 
   const [isTyping, setIsTyping] = useState(false);
   const [loadingText, setLoadingText] = useState("");
@@ -90,6 +95,12 @@ const App: React.FC = () => {
       localStorage.setItem("vibeai_matches", JSON.stringify(matches));
     }
   }, [matches]);
+
+  // Update URL based on step (User Request #6)
+  useEffect(() => {
+    const path = step === "landing" ? "/" : `/${step}`;
+    window.history.pushState({ step }, "", path);
+  }, [step]);
 
   // Initialize chat when entering chat step
   useEffect(() => {
@@ -148,7 +159,21 @@ const App: React.FC = () => {
 
     const userMessageCount = newHistory.filter((m) => m.role === "user").length;
     if (userMessageCount >= MAX_QUESTIONS) {
-      handleFinishChat(newHistory);
+      // User Request #2: Proper transition before moving
+      setIsTyping(true);
+      setTimeout(() => {
+        setChatHistory((prev) => [
+          ...prev,
+          {
+            role: "model",
+            text: "Bet. I've got enough data to build your vibe profile. Let's see who's out there for you. 🚀",
+          } as Message,
+        ]);
+        setIsTyping(false);
+        setTimeout(() => {
+          handleFinishChat(newHistory);
+        }, 2500);
+      }, 1000);
       return;
     }
 
@@ -259,7 +284,10 @@ const App: React.FC = () => {
           >
             <span className="w-3 h-3 bg-[#ccff00] animate-pulse"></span>
             <span className="font-display font-bold text-lg tracking-tight">
-              VIBE_AI_PROTOCOL
+              VIBE_AI_PROTOCOL{" "}
+              <span className="text-[10px] text-[#ccff00] ml-2 font-mono">
+                POWERED_BY_GEMINI_3
+              </span>
             </span>
           </div>
           <button
@@ -801,6 +829,41 @@ const App: React.FC = () => {
                   >
                     [ REBOOT_SYSTEM ]
                   </button>
+                </div>
+
+                {/* Beta Testing Banner - User Request #5 */}
+                <div className="bg-orange-500/10 border border-orange-500/50 rounded-xl p-4 backdrop-blur-md mb-6 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-orange-500/5 group-hover:bg-orange-500/10 transition-colors"></div>
+                  <div className="flex items-start gap-4 relative z-10">
+                    <div className="p-2 bg-orange-500/20 rounded-lg text-orange-400">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        className="w-6 h-6"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M14.615 1.595a.75.75 0 01.359.852L12.982 9.75h7.268a.75.75 0 01.548 1.262l-10.5 11.25a.75.75 0 01-1.272-.71l1.992-7.302H3.75a.75.75 0 01-.548-1.262l10.5-11.25a.75.75 0 01.913-.143z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-orange-200 uppercase tracking-wider mb-1">
+                        Beta Test Mode Active
+                      </h3>
+                      <p className="text-xs text-orange-100/70 leading-relaxed">
+                        You are viewing{" "}
+                        <span className="text-white font-bold">
+                          AI-Generated Profiles
+                        </span>
+                        . These candidates are synthetic personalities created
+                        by Gemini to demonstrate the matching engine
+                        capabilities.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
