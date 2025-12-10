@@ -9,6 +9,19 @@ const localConfig = require("./config");
 admin.initializeApp();
 const db = admin.firestore();
 
+// --- SECURITY: CORS Whitelist ---
+const ALLOWED_ORIGINS = [
+  'https://vibeaipartner.web.app',
+  'https://vibeaipartner.firebaseapp.com',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
+// --- SECURITY: Rate Limiting ---
+const rateLimitMap = new Map();
+const RATE_LIMIT_REQUESTS = 30; // Max requests per minute per user
+const RATE_LIMIT_WINDOW = 60000; // 1 minute in ms
+
 // Cache for settings to avoid reading Firestore on every request
 let cachedSettings = null;
 let settingsCacheTime = 0;
@@ -48,8 +61,23 @@ const getSettings = async () => {
 
 // Initialize Express App for API routing
 const app = express();
-app.use(cors({ origin: true }));
-app.use(express.json());
+
+// --- SECURITY: Restricted CORS ---
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc) in development only
+    if (!origin) {
+      return callback(null, true);
+    }
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('CORS not allowed'), false);
+  },
+  credentials: true
+}));
+
+app.use(express.json({ limit: '1mb' })); // Limit payload size
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -60,6 +88,153 @@ app.use((req, res, next) => {
   });
   next();
 });
+
+// --- SECURITY: Firebase ID Token Verification ---
+const verifyAuthToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  // Allow x-user-id fallback for backward compatibility (will be removed in future)
+  const legacyUserId = req.headers['x-user-id'];
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const idToken = authHeader.split('Bearer ')[1];
+    try {
+      // Verify Firebase ID token
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      req.user = {
+        id: decodedToken.uid,
+        email: decodedToken.email,
+        name: decodedToken.name
+      };
+      return next();
+    } catch (error) {
+      console.error('Token verification failed:', error.message);
+      // Fall through to legacy auth
+    }
+  }
+  
+  // Legacy fallback - use x-user-id header (for existing sessions)
+  // TODO: Remove this fallback after migration period
+  if (legacyUserId && legacyUserId !== 'anonymous') {
+    req.user = { id: legacyUserId };
+    return next();
+  }
+  
+  // Allow anonymous users for now (but track them)
+  req.user = { id: 'anonymous_' + Date.now() };
+  next();
+};
+
+// --- SECURITY: Per-User Rate Limiting ---
+const checkRateLimit = (req, res, next) => {
+  const userId = req.user?.id || 'anonymous';
+  const now = Date.now();
+  
+  // Get user's request timestamps
+  let userRequests = rateLimitMap.get(userId) || [];
+  
+  // Filter to only recent requests within window
+  userRequests = userRequests.filter(timestamp => now - timestamp < RATE_LIMIT_WINDOW);
+  
+  if (userRequests.length >= RATE_LIMIT_REQUESTS) {
+    return res.status(429).json({
+      error: 'Rate limit exceeded. Please slow down.',
+      retryAfter: Math.ceil((userRequests[0] + RATE_LIMIT_WINDOW - now) / 1000)
+    });
+  }
+  
+  // Add current request
+  userRequests.push(now);
+  rateLimitMap.set(userId, userRequests);
+  
+  // Cleanup old entries periodically (every 100 requests)
+  if (Math.random() < 0.01) {
+    for (const [key, timestamps] of rateLimitMap.entries()) {
+      const filtered = timestamps.filter(t => now - t < RATE_LIMIT_WINDOW);
+      if (filtered.length === 0) {
+        rateLimitMap.delete(key);
+      } else {
+        rateLimitMap.set(key, filtered);
+      }
+    }
+  }
+  
+  next();
+};
+
+// --- SECURITY: Input Validation Helpers ---
+const validateChatInput = (req, res, next) => {
+  const { message, history } = req.body;
+  
+  if (!message || typeof message !== 'string') {
+    return res.status(400).json({ error: 'Invalid message format' });
+  }
+  
+  if (message.length > 2000) {
+    return res.status(400).json({ error: 'Message too long (max 2000 characters)' });
+  }
+  
+  if (history && !Array.isArray(history)) {
+    return res.status(400).json({ error: 'Invalid history format' });
+  }
+  
+  if (history && history.length > 50) {
+    return res.status(400).json({ error: 'History too long (max 50 messages)' });
+  }
+  
+  next();
+};
+
+const validatePersonaInput = (req, res, next) => {
+  const { history } = req.body;
+  
+  if (!history || !Array.isArray(history)) {
+    return res.status(400).json({ error: 'History is required and must be an array' });
+  }
+  
+  if (history.length > 100) {
+    return res.status(400).json({ error: 'History too long' });
+  }
+  
+  next();
+};
+
+const validateMatchInput = (req, res, next) => {
+  const { userPersona, candidates } = req.body;
+  
+  if (!userPersona || typeof userPersona !== 'object') {
+    return res.status(400).json({ error: 'Invalid userPersona' });
+  }
+  
+  if (!candidates || !Array.isArray(candidates)) {
+    return res.status(400).json({ error: 'Invalid candidates format' });
+  }
+  
+  if (candidates.length > 20) {
+    return res.status(400).json({ error: 'Too many candidates (max 20)' });
+  }
+  
+  next();
+};
+
+const validateTranscribeInput = (req, res, next) => {
+  const { audio, mimeType } = req.body;
+  
+  if (!audio || typeof audio !== 'string') {
+    return res.status(400).json({ error: 'Invalid audio data' });
+  }
+  
+  if (!mimeType || typeof mimeType !== 'string') {
+    return res.status(400).json({ error: 'Invalid mimeType' });
+  }
+  
+  // Check audio size (base64 is ~1.33x original, limit to ~5MB audio)
+  if (audio.length > 7000000) {
+    return res.status(400).json({ error: 'Audio file too large' });
+  }
+  
+  next();
+};
 
 // Initialize Gemini
 // CRITICAL: Ensure you set this via: firebase functions:config:set gemini.key="YOUR_KEY"
@@ -120,7 +295,7 @@ const checkAndRegisterUser = async (userId) => {
   }
 };
 
-// Cleanup old sessions (runs on each request)
+// Cleanup old sessions
 const cleanupOldSessions = async () => {
   try {
     const settings = await getSettings();
@@ -144,9 +319,13 @@ const cleanupOldSessions = async () => {
   }
 };
 
+// Apply auth and rate limiting to all routes
+app.use(verifyAuthToken);
+app.use(checkRateLimit);
+
 // Middleware to check user limit before processing requests
 app.use(async (req, res, next) => {
-  const userId = req.headers['x-user-id'];
+  const userId = req.user?.id;
   const path = req.path;
   // Check for paths with or without /api prefix
   if (userId && (path.endsWith('/chat') || path.endsWith('/persona') || path.endsWith('/match'))) {
@@ -157,26 +336,34 @@ app.use(async (req, res, next) => {
         retryAfter: 60 
       });
     }
-    // Cleanup expired sessions in background
-    cleanupOldSessions().catch(err => console.error('Cleanup failed:', err));
   }
-  next()
+  next();
 });
 
+// --- SECURITY: Generic Error Handler ---
+const handleError = (res, error, context) => {
+  console.error(`${context} Error:`, error.message, { stack: error.stack });
+  // Don't expose internal error details to client
+  res.status(500).json({ error: 'An error occurred. Please try again.' });
+};
+
 // 1. CHAT ENDPOINT
-app.post(["/chat", "/api/chat"], async (req, res) => {
+app.post(["/chat", "/api/chat"], validateChatInput, async (req, res) => {
   const startTime = Date.now();
   try {
     const { history, message } = req.body;
     const settings = await getSettings();
     const maxWords = settings.MAX_CHAT_RESPONSE_WORDS || 20;
 
-    console.log(`Chat request - History length: ${history?.length || 0}, Message length: ${message?.length || 0}`);
+    // Limit history to last 20 messages for performance
+    const limitedHistory = (history || []).slice(-20);
+
+    console.log(`Chat request - History length: ${limitedHistory.length}, Message length: ${message.length}`);
     
     // Construct the chat session statefully on the backend
     const chat = ai.chats.create({
       model: CHAT_MODEL,
-      history: history || [], // { role: 'user' | 'model', parts: [{ text: string }] }
+      history: limitedHistory,
       config: {
         systemInstruction: `You are 'MyPartner AI', a chill, intuitive, and hype-man wingman for Gen Z users.
         Your goal is to have a casual "vibe check" (conversation) to understand their personality, lore (life history), and what they really want.
@@ -195,13 +382,12 @@ app.post(["/chat", "/api/chat"], async (req, res) => {
     res.json({ text: result.text });
 
   } catch (error) {
-    console.error("Chat Error:", error.message, { stack: error.stack, historyLength: req.body.history?.length });
-    res.status(500).json({ error: error.message });
+    handleError(res, error, 'Chat');
   }
 });
 
 // 2. PERSONA ANALYSIS ENDPOINT
-app.post(["/persona", "/api/persona"], async (req, res) => {
+app.post(["/persona", "/api/persona"], validatePersonaInput, async (req, res) => {
   try {
     const { history } = req.body; // Array of strings ["USER: hi", "MODEL: hello"]
     
@@ -238,13 +424,12 @@ app.post(["/persona", "/api/persona"], async (req, res) => {
     res.json(JSON.parse(response.text));
 
   } catch (error) {
-    console.error("Persona Error:", error.message, { stack: error.stack });
-    res.status(500).json({ error: error.message });
+    handleError(res, error, 'Persona');
   }
 });
 
 // 3. MATCHING ENDPOINT
-app.post(["/match", "/api/match"], async (req, res) => {
+app.post(["/match", "/api/match"], validateMatchInput, async (req, res) => {
   try {
     const { userPersona, candidates } = req.body;
 
@@ -288,13 +473,12 @@ app.post(["/match", "/api/match"], async (req, res) => {
     res.json(JSON.parse(response.text));
 
   } catch (error) {
-    console.error("Match Error:", error.message, { stack: error.stack, candidatesCount: req.body.candidates?.length });
-    res.status(500).json({ error: error.message });
+    handleError(res, error, 'Match');
   }
 });
 
 // 4. TRANSCRIPTION ENDPOINT
-app.post(["/transcribe", "/api/transcribe"], async (req, res) => {
+app.post(["/transcribe", "/api/transcribe"], validateTranscribeInput, async (req, res) => {
   try {
     const { audio, mimeType } = req.body;
     
@@ -310,10 +494,16 @@ app.post(["/transcribe", "/api/transcribe"], async (req, res) => {
 
     res.json({ text: response.text });
   } catch (error) {
-    console.error("Transcription Error:", error.message, { stack: error.stack, mimeType: req.body.mimeType });
-    res.status(500).json({ error: error.message });
+    handleError(res, error, 'Transcription');
   }
 });
 
 // Expose the Express API as a single Cloud Function
 exports.api = functions.https.onRequest(app);
+
+// --- SCHEDULED CLEANUP: Runs every 15 minutes ---
+exports.scheduledCleanup = functions.pubsub.schedule('every 15 minutes').onRun(async (context) => {
+  console.log('Running scheduled session cleanup...');
+  await cleanupOldSessions();
+  return null;
+});

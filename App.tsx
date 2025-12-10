@@ -110,21 +110,21 @@ const App: React.FC = () => {
           chatSessionRef.current = createChatSession();
 
           if (chatHistory.length === 0) {
-            setIsTyping(true);
-            const response: GenerateContentResponse =
-              await chatSessionRef.current.sendMessage({
-                message:
-                  "Start the conversation with a casual greeting and ask for my name.",
-              });
+            // Use instant hardcoded greeting instead of AI API call
+            const greetings = [
+              "hey! what's your name? and more importantly, what's a moment that changed your life?",
+              "yo what's good. let's start with your name and a quick lore drop about yourself.",
+              "sup! i'm here to get to know the real you. what's your name first?",
+              "hey there! name and a quick story about yourself to start vibing?",
+              "what's up! let's start simple - who are you and what's your vibe?",
+            ];
+            const greeting =
+              greetings[Math.floor(Math.random() * greetings.length)];
 
-            if (response.text) {
-              setChatHistory([{ role: "model", text: response.text }]);
-            }
-            setIsTyping(false);
+            setChatHistory([{ role: "model", text: greeting }]);
           }
         } catch (error) {
           console.error("Failed to start chat", error);
-          setIsTyping(false);
         }
       };
       initChat();
@@ -257,18 +257,14 @@ const App: React.FC = () => {
     }
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#030303] text-zinc-100">
-        <AuthPage
-          onLoginSuccess={() => {
-            analytics.userLogin("google");
-            setIsAuthenticated(true);
-          }}
-        />
-      </div>
-    );
-  }
+  // Show auth modal when user tries to start chat without being logged in
+  const handleStartVibeCheck = () => {
+    if (!isAuthenticated) {
+      setStep("auth");
+    } else {
+      setStep("chat");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#030303] text-zinc-100 selection:bg-[#ccff00] selection:text-black overflow-x-hidden relative grid-lines">
@@ -280,7 +276,10 @@ const App: React.FC = () => {
         <div className="flex justify-between items-center px-4 md:px-8 py-4">
           <div
             className="flex items-center gap-3 cursor-pointer"
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              setStep("landing");
+              window.scrollTo(0, 0);
+            }}
           >
             <span className="w-3 h-3 bg-[#ccff00] animate-pulse"></span>
             <span className="font-display font-bold text-lg tracking-tight">
@@ -290,17 +289,31 @@ const App: React.FC = () => {
               </span>
             </span>
           </div>
-          <button
-            onClick={handleLogout}
-            className="text-[10px] font-mono hover:bg-white hover:text-black px-2 py-1 transition-colors border border-white/20"
-          >
-            [ TERMINATE_SESSION ]
-          </button>
+          {isAuthenticated && (
+            <button
+              onClick={handleLogout}
+              className="text-[10px] font-mono hover:bg-white hover:text-black px-2 py-1 transition-colors border border-white/20"
+            >
+              [ TERMINATE_SESSION ]
+            </button>
+          )}
         </div>
       </header>
 
       {/* Main Content */}
       <main className="pt-20 min-h-screen flex flex-col relative z-10">
+        {step === "auth" && (
+          <div className="container mx-auto px-4 py-8 max-w-md">
+            <AuthPage
+              onLoginSuccess={() => {
+                analytics.userLogin("google");
+                setIsAuthenticated(true);
+                setStep("chat");
+              }}
+            />
+          </div>
+        )}
+
         {step === "landing" && (
           <div className="flex-1 flex flex-col relative">
             {/* Visual Blobs - Enhanced */}
@@ -317,13 +330,33 @@ const App: React.FC = () => {
               </div>
 
               <div className="max-w-7xl mx-auto w-full">
+                {/* Brand Logo + Tagline */}
+                <div className="mb-12 flex items-center gap-4 animate-fade-in-up">
+                  <div className="flex flex-col">
+                    <div className="inline-flex items-center gap-2 mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ccff00] to-pink-500 flex items-center justify-center font-display font-black text-black shadow-lg shadow-[#ccff00]/20">
+                        V
+                      </div>
+                      <span className="font-display font-black text-2xl tracking-tight">
+                        VIBE_AI
+                      </span>
+                      <span className="text-[10px] font-mono text-[#ccff00] bg-[#ccff00]/10 px-2 py-1 rounded border border-[#ccff00]/30">
+                        BETA
+                      </span>
+                    </div>
+                    <p className="text-xs font-mono text-zinc-500 tracking-widest">
+                      /// DIGITAL_INTIMACY_PROTOCOL
+                    </p>
+                  </div>
+                </div>
+
                 {/* Headline */}
-                <div className="mb-8">
-                  <div className="text-[#ccff00] font-mono text-xs mb-4 tracking-widest">
+                <div className="mb-10">
+                  <div className="text-[#ccff00] font-mono text-xs mb-6 tracking-widest">
                     /// PROTOCOL_INITIATED
                   </div>
                   <h1
-                    className="text-5xl md:text-7xl lg:text-[10rem] font-display font-black leading-[0.85] tracking-tighter text-white uppercase glitch"
+                    className="text-5xl md:text-7xl lg:text-8xl font-display font-black leading-[0.9] tracking-tighter text-white uppercase glitch"
                     data-text="WHERE STORIES CONNECT SOULS"
                   >
                     WHERE <br />
@@ -335,65 +368,109 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Subtext */}
-                <div className="max-w-xl mb-12">
-                  <p className="font-mono text-sm md:text-base text-zinc-400 leading-relaxed border-l-2 border-[#ccff00] pl-4">
-                    Current dating protocols are obsolete. <br />
+                <div className="max-w-2xl mb-12">
+                  <div className="inline-block mb-6 px-4 py-2 bg-[#ccff00]/10 border border-[#ccff00]/30 rounded-xl backdrop-blur-sm">
+                    <span className="text-[#ccff00] text-xs font-bold tracking-widest">
+                      POWERED_BY_GEMINI_3_PRO
+                    </span>
+                  </div>
+                  <p className="font-mono text-base md:text-lg text-zinc-300 leading-relaxed border-l-4 border-[#ccff00] pl-6 mb-6">
+                    Current dating protocols are{" "}
+                    <span className="text-red-400 line-through">obsolete</span>{" "}
+                    <span className="text-[#ccff00]">REIMAGINED</span>. <br />
+                    We don't swipe. We don't judge. <br />
                     We use{" "}
                     <span className="text-[#ccff00] font-bold">
-                      Gemini 3 Neural Architecture
+                      Gemini 3 Pro's Advanced Reasoning
                     </span>{" "}
-                    to parse your soul into raw data, then match you with
-                    someone who actually{" "}
-                    <span className="text-white">gets</span> you.
+                    to understand{" "}
+                    <span className="italic">who you actually are</span>, then
+                    match you with someone who genuinely gets it.
                   </p>
+                  <div className="flex flex-wrap gap-3 text-[11px] font-mono text-zinc-400">
+                    <span className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-[#ccff00]"></span>
+                      One Conversation
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-pink-500"></span>
+                      Real Matches
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-purple-500"></span>
+                      No Swiping
+                    </span>
+                  </div>
                 </div>
 
                 {/* CTA Buttons */}
-                <div className="flex flex-col sm:flex-row gap-4 mb-16">
+                <div className="flex flex-col sm:flex-row gap-4 mb-20">
                   <button
-                    onClick={() => setStep("chat")}
-                    className="group relative px-8 py-5 bg-[#ccff00] text-black font-display font-bold text-xl uppercase tracking-tight overflow-hidden transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    onClick={handleStartVibeCheck}
+                    className="group relative px-8 py-5 bg-[#ccff00] text-black font-display font-bold text-lg uppercase tracking-tight overflow-hidden transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#ccff00]/20"
                   >
                     <span className="relative z-10 flex items-center gap-3">
-                      <span className="w-3 h-3 bg-black rounded-full group-hover:animate-ping"></span>
-                      Start Vibe Check
+                      <span className="w-2 h-2 bg-black rounded-full group-hover:animate-ping"></span>
+                      Start Vibe Check (5 min)
                     </span>
                     <div className="absolute inset-0 bg-white translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
                   </button>
+                  <button
+                    onClick={() =>
+                      document
+                        .querySelector('[id="how-it-works"]')
+                        ?.scrollIntoView({ behavior: "smooth" })
+                    }
+                    className="px-8 py-5 border-2 border-white/30 text-white font-display font-bold text-lg uppercase tracking-tight hover:border-white/60 hover:bg-white/5 transition-all"
+                  >
+                    Learn How It Works
+                  </button>
                 </div>
 
-                {/* Stats Row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 border-t border-white/10 pt-8">
+                {/* Quick Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 border-t border-white/10 pt-12">
                   <div className="group">
-                    <h3 className="text-3xl md:text-5xl font-display font-bold text-[#ccff00] group-hover:scale-110 transition-transform origin-left">
+                    <h3 className="text-4xl md:text-5xl font-display font-black text-[#ccff00] group-hover:scale-110 transition-transform origin-left mb-2">
                       500+
                     </h3>
-                    <p className="font-mono text-[10px] text-zinc-500 uppercase mt-1">
-                      AI_Personalities
+                    <p className="font-mono text-[11px] md:text-[12px] text-zinc-200 font-bold uppercase tracking-widest">
+                      AI Personalities
+                    </p>
+                    <p className="text-[10px] text-zinc-400 mt-1.5 font-medium">
+                      Unique matches
                     </p>
                   </div>
                   <div className="group">
-                    <h3 className="text-3xl md:text-5xl font-display font-bold text-white group-hover:scale-110 transition-transform origin-left">
+                    <h3 className="text-4xl md:text-5xl font-display font-black text-white group-hover:scale-110 transition-transform origin-left mb-2">
                       99.9%
                     </h3>
-                    <p className="font-mono text-[10px] text-zinc-500 uppercase mt-1">
-                      Match_Accuracy
+                    <p className="font-mono text-[11px] md:text-[12px] text-zinc-200 font-bold uppercase tracking-widest">
+                      Match Accuracy
+                    </p>
+                    <p className="text-[10px] text-zinc-400 mt-1.5 font-medium">
+                      Based on reasoning
                     </p>
                   </div>
                   <div className="group">
-                    <h3 className="text-3xl md:text-5xl font-display font-bold text-pink-500 group-hover:scale-110 transition-transform origin-left">
+                    <h3 className="text-4xl md:text-5xl font-display font-black text-pink-500 group-hover:scale-110 transition-transform origin-left mb-2">
                       0
                     </h3>
-                    <p className="font-mono text-[10px] text-zinc-500 uppercase mt-1">
-                      Swipes_Required
+                    <p className="font-mono text-[11px] md:text-[12px] text-zinc-200 font-bold uppercase tracking-widest">
+                      Swipes Needed
+                    </p>
+                    <p className="text-[10px] text-zinc-400 mt-1.5 font-medium">
+                      No endless scrolling
                     </p>
                   </div>
                   <div className="group">
-                    <h3 className="text-3xl md:text-5xl font-display font-bold text-purple-500 group-hover:scale-110 transition-transform origin-left">
+                    <h3 className="text-4xl md:text-5xl font-display font-black text-purple-500 group-hover:scale-110 transition-transform origin-left mb-2">
                       5min
                     </h3>
-                    <p className="font-mono text-[10px] text-zinc-500 uppercase mt-1">
-                      Time_To_Match
+                    <p className="font-mono text-[11px] md:text-[12px] text-zinc-200 font-bold uppercase tracking-widest">
+                      Time To Match
+                    </p>
+                    <p className="text-[10px] text-zinc-400 mt-1.5 font-medium">
+                      Fast & efficient
                     </p>
                   </div>
                 </div>
@@ -401,7 +478,10 @@ const App: React.FC = () => {
             </section>
 
             {/* HOW IT WORKS SECTION */}
-            <section className="py-20 md:py-32 px-4 md:px-8 lg:px-16 border-t border-white/10 relative">
+            <section
+              id="how-it-works"
+              className="py-24 md:py-32 px-4 md:px-8 lg:px-16 border-t border-white/10 relative"
+            >
               <div className="max-w-7xl mx-auto">
                 <div className="mb-16">
                   <div className="text-[#ccff00] font-mono text-xs mb-4 tracking-widest">
@@ -757,7 +837,7 @@ const App: React.FC = () => {
                   No credit card. No commitment. Just vibes.
                 </p>
                 <button
-                  onClick={() => setStep("chat")}
+                  onClick={handleStartVibeCheck}
                   className="group relative px-12 py-6 bg-[#ccff00] text-black font-display font-bold text-2xl uppercase tracking-tight overflow-hidden transition-all hover:scale-105 active:scale-95"
                 >
                   <span className="relative z-10 flex items-center gap-4 justify-center">
@@ -882,11 +962,25 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Footer / Copyright */}
-      <footer className="fixed bottom-4 left-4 z-40 mix-blend-difference hidden md:block">
-        <p className="text-[10px] font-mono text-white/50">
-          VIBE_AI © 2025 // POWERED BY GEMINI 3
-        </p>
+      {/* Footer / Copyright - RIGHT SIDE + MOBILE VISIBLE */}
+      <footer className="fixed bottom-4 right-4 z-40">
+        <div className="bg-black/80 backdrop-blur-xl border border-[#ccff00]/40 rounded-xl p-3 md:p-4 shadow-2xl shadow-[#ccff00]/20 hover:border-[#ccff00]/70 hover:shadow-[#ccff00]/40 transition-all duration-300 max-w-[200px] md:max-w-none">
+          <p className="text-[9px] md:text-[11px] font-bold font-mono text-[#ccff00] tracking-widest mb-1.5 md:mb-2">
+            ✦ VIBE_AI © 2025
+          </p>
+          <p className="text-[8px] md:text-[10px] font-mono text-white mb-2 md:mb-2.5">
+            Digital Matchmaking Platform
+          </p>
+          <div className="border-t border-[#ccff00]/20 pt-2 md:pt-2.5">
+            <p className="text-[8px] md:text-[9px] font-mono text-blue-300">
+              Built with{" "}
+              <span className="text-[#ccff00] font-bold">Gemini 3 Pro</span>
+            </p>
+            <p className="text-[7px] md:text-[9px] font-mono text-pink-300">
+              Advanced Reasoning + Multimodality
+            </p>
+          </div>
+        </div>
       </footer>
     </div>
   );

@@ -1,11 +1,34 @@
 import { UserPersona, MatchResult, CandidateProfile, Message } from "../types";
-import { getCurrentUser } from "./authService";
+import { getCurrentUser, getAuthToken } from "./authService";
 
 // Determine API Base URL
 // If in development (localhost), we assume the rewrite works locally via `firebase hosting:start`
 // or points to the emulator if configured.
 // For now, we use a relative path '/api' which works if the app is hosted on Firebase.
 const API_BASE = "/api";
+
+// Max history to send to backend to prevent large payloads
+const MAX_HISTORY_SIZE = 20;
+
+// Helper to get auth headers
+const getAuthHeaders = (): HeadersInit => {
+  const token = getAuthToken();
+  const user = getCurrentUser();
+
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+
+  // Prefer Bearer token if available
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  // Fallback to x-user-id for backward compatibility
+  headers["x-user-id"] = user?.id || "anonymous";
+
+  return headers;
+};
 
 /**
  * Mock Session Class to maintain compatibility with App.tsx
@@ -20,19 +43,21 @@ class BackendChatSession {
   // but for simplicity we keep internal history state here.
 
   async sendMessage({ message }: { message: string }) {
+    // Validate message length client-side
+    if (message.length > 2000) {
+      throw new Error("Message too long (max 2000 characters)");
+    }
+
     // Optimistic update of history
     this.history.push({ role: "user", parts: [{ text: message }] });
 
     try {
-      const user = getCurrentUser();
       const response = await fetch(`${API_BASE}/chat`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": user?.id || "anonymous",
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
-          history: this.history, // Send full history for context
+          // Only send last N messages to prevent large payloads
+          history: this.history.slice(-MAX_HISTORY_SIZE),
           message: message,
         }),
       });
@@ -52,7 +77,8 @@ class BackendChatSession {
       return { text: modelText };
     } catch (e) {
       console.error("API Call Failed", e);
-      // Remove the user message if failed? Or just error out.
+      // Remove the user message if failed
+      this.history.pop();
       throw e;
     }
   }
@@ -67,14 +93,22 @@ export const transcribeAudio = async (
   audioBase64: string,
   mimeType: string
 ): Promise<string> => {
+  // Validate audio size client-side (5MB limit after base64 encoding)
+  if (audioBase64.length > 7000000) {
+    throw new Error("Audio file too large");
+  }
+
   try {
     const response = await fetch(`${API_BASE}/transcribe`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ audio: audioBase64, mimeType }),
     });
 
-    if (!response.ok) throw new Error("Transcription failed");
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Transcription failed");
+    }
     const data = await response.json();
     return data.text || "";
   } catch (error) {
@@ -89,11 +123,14 @@ export const generateUserPersona = async (
   try {
     const response = await fetch(`${API_BASE}/persona`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ history: chatHistory }),
     });
 
-    if (!response.ok) throw new Error("Persona generation failed");
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Persona generation failed");
+    }
     return await response.json();
   } catch (error) {
     console.error("Persona Generation Error", error);
@@ -145,14 +182,17 @@ export const findMatches = async (
   try {
     const response = await fetch(`${API_BASE}/match`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         userPersona,
         candidates: shortlistedCandidates,
       }),
     });
 
-    if (!response.ok) throw new Error("Matching failed");
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Matching failed");
+    }
     return await response.json();
   } catch (error) {
     console.error("Matching Error", error);
