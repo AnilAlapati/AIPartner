@@ -13,6 +13,7 @@ import {
   createChatSession,
   generateUserPersona,
   findMatches,
+  getUserProfile,
 } from "./services/geminiService";
 import { getCurrentUser, logout } from "./services/authService";
 import { initGA, analytics } from "./services/analytics";
@@ -69,10 +70,33 @@ const App: React.FC = () => {
 
   // Check auth on load
   useEffect(() => {
-    const user = getCurrentUser();
-    if (user) {
-      setIsAuthenticated(true);
-    }
+    const checkUserStatus = async () => {
+      const user = getCurrentUser();
+      if (user) {
+        setIsAuthenticated(true);
+
+        // Check if user already has a profile on server to prevent re-creation abuse
+        if (!userPersona) {
+          try {
+            const existingProfile = await getUserProfile();
+            if (existingProfile) {
+              console.log("Restoring existing profile from server");
+              setUserPersona(existingProfile);
+              setStep((currentStep) => {
+                if (currentStep === "landing" || currentStep === "chat") {
+                  return "profile";
+                }
+                return currentStep;
+              });
+            }
+          } catch (e) {
+            console.error("Failed to check user profile", e);
+          }
+        }
+      }
+    };
+
+    checkUserStatus();
   }, []);
 
   // Persist state changes
@@ -275,8 +299,13 @@ const App: React.FC = () => {
       <header className="fixed top-0 left-0 w-full z-50 mix-blend-difference border-b border-white/10 backdrop-blur-sm">
         <div className="flex justify-between items-center px-4 md:px-8 py-4">
           <div
-            className="flex items-center gap-3 cursor-pointer"
+            className={`flex items-center gap-3 ${
+              step === "profile" || step === "matches"
+                ? "cursor-default opacity-50"
+                : "cursor-pointer"
+            }`}
             onClick={() => {
+              if (step === "profile" || step === "matches") return;
               setStep("landing");
               window.scrollTo(0, 0);
             }}
@@ -289,14 +318,6 @@ const App: React.FC = () => {
               </span>
             </span>
           </div>
-          {isAuthenticated && (
-            <button
-              onClick={handleLogout}
-              className="text-[10px] font-mono hover:bg-white hover:text-black px-2 py-1 transition-colors border border-white/20"
-            >
-              [ TERMINATE_SESSION ]
-            </button>
-          )}
         </div>
       </header>
 
@@ -305,10 +326,24 @@ const App: React.FC = () => {
         {step === "auth" && (
           <div className="container mx-auto px-4 py-8 max-w-md">
             <AuthPage
-              onLoginSuccess={() => {
+              onLoginSuccess={async () => {
                 analytics.userLogin("google");
                 setIsAuthenticated(true);
-                setStep("chat");
+
+                // Check for existing profile
+                try {
+                  const existingProfile = await getUserProfile();
+                  if (existingProfile) {
+                    console.log("Restoring existing profile from server");
+                    setUserPersona(existingProfile);
+                    setStep("profile");
+                  } else {
+                    setStep("chat");
+                  }
+                } catch (e) {
+                  console.error("Failed to check profile on login", e);
+                  setStep("chat");
+                }
               }}
             />
           </div>
@@ -903,12 +938,6 @@ const App: React.FC = () => {
                       Your Roster
                     </h2>
                   </div>
-                  <button
-                    onClick={handleReset}
-                    className="px-6 py-3 border border-white/20 text-xs font-mono bg-transparent hover:bg-white hover:text-black transition-all"
-                  >
-                    [ REBOOT_SYSTEM ]
-                  </button>
                 </div>
 
                 {/* Beta Testing Banner - User Request #5 */}

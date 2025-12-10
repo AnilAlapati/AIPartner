@@ -199,3 +199,25 @@ export const findMatches = async (
     throw error;
   }
 };
+
+export const getUserProfile = async (): Promise<UserPersona | null> => {
+  try {
+    const response = await fetch(`${API_BASE}/user/profile`, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    });
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch profile");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Get Profile Error", error);
+    return null;
+  }
+};

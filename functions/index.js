@@ -17,6 +17,12 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000'
 ];
 
+// Add current project domain dynamically if available
+if (process.env.GCLOUD_PROJECT) {
+  ALLOWED_ORIGINS.push(`https://${process.env.GCLOUD_PROJECT}.web.app`);
+  ALLOWED_ORIGINS.push(`https://${process.env.GCLOUD_PROJECT}.firebaseapp.com`);
+}
+
 // --- SECURITY: Rate Limiting ---
 const rateLimitMap = new Map();
 const RATE_LIMIT_REQUESTS = 30; // Max requests per minute per user
@@ -120,9 +126,8 @@ const verifyAuthToken = async (req, res, next) => {
     return next();
   }
   
-  // Allow anonymous users for now (but track them)
-  req.user = { id: 'anonymous_' + Date.now() };
-  next();
+  // No valid token found - Reject request
+  return res.status(401).json({ error: 'Unauthorized. Please log in.' });
 };
 
 // --- SECURITY: Per-User Rate Limiting ---
@@ -421,10 +426,41 @@ app.post(["/persona", "/api/persona"], validatePersonaInput, async (req, res) =>
       }
     });
 
-    res.json(JSON.parse(response.text));
+    const persona = JSON.parse(response.text);
+
+    // Save persona to Firestore
+    if (req.user && req.user.id) {
+      await db.collection('userProfiles').doc(req.user.id).set({
+        ...persona,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    res.json(persona);
 
   } catch (error) {
     handleError(res, error, 'Persona');
+  }
+});
+
+// 2.5 GET USER PROFILE ENDPOINT
+app.get(["/user/profile", "/api/user/profile"], async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
+    }
+
+    const doc = await db.collection('userProfiles').doc(userId).get();
+    
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    res.json(doc.data());
+  } catch (error) {
+    handleError(res, error, 'Get Profile');
   }
 });
 

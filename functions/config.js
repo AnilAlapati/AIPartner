@@ -11,12 +11,12 @@ module.exports = {
   GEMINI_MODEL: 'gemini-3-pro-preview',
   
   // User Management
-  MAX_ACTIVE_USERS: 100,  // Maximum concurrent active users
+  MAX_ACTIVE_USERS: 50,  // Maximum concurrent active users
   SESSION_TIMEOUT_MINUTES: 60,  // Session expires after 60 minutes of inactivity
   
   // Chat Settings
   MAX_CHAT_MESSAGES: 5,  // Maximum messages per user session
-  MAX_CHAT_RESPONSE_WORDS: 20, // Max words per AI response
+  MAX_CHAT_RESPONSE_WORDS: 100, // Max words per AI response
   
   // Matching
   CANDIDATE_POOL_SIZE: 500,  // Total candidates to generate
