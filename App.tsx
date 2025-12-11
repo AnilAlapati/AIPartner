@@ -247,7 +247,8 @@ const App: React.FC = () => {
     setChatHistory([]);
     setUserPersona(null);
     setMatches([]);
-    window.location.reload();
+    // Force redirect to root instead of reloading current URL
+    window.location.href = "/";
   };
 
   const handleLogout = () => {
