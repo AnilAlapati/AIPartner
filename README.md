@@ -269,20 +269,11 @@ See [`DEPLOY.md`](./DEPLOY.md) for detailed deployment instructions.
 
 ---
 
-## 🤝 **Contributing**
+## 🚫 **Contributing**
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+This is a **personal project** built for the Google DeepMind Vibe Coding with Gemini 3 Pro Hackathon. **Contributions are not being accepted** at this time.
 
-### **Development Guidelines**
-
-- Use TypeScript for all new code
-- Follow React best practices
-- Test all changes locally before submitting
-- Update documentation for new features
+The repository is public for **educational and demonstration purposes** only. If you're interested in the code, feel free to fork it for your own learning and experimentation.
 
 ---
 
