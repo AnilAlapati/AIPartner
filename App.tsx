@@ -420,6 +420,17 @@ const App: React.FC = () => {
               </span>
             </span>
           </div>
+
+          {/* Terminate Session Button - Visible on all pages except landing */}
+          {step !== "landing" && (
+            <button
+              onClick={handleLogout}
+              className="text-[10px] md:text-xs font-mono text-red-500 hover:text-red-400 border border-red-500/30 hover:border-red-500/60 bg-red-500/5 hover:bg-red-500/10 px-3 py-1.5 rounded transition-all uppercase tracking-wider flex items-center gap-2"
+            >
+              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
+              Terminate Session
+            </button>
+          )}
         </div>
       </header>
 
