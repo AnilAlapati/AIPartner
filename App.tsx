@@ -33,6 +33,26 @@ const App: React.FC = () => {
 
   // Initialize state from localStorage if available
   const [step, setStep] = useState<AppStep>(() => {
+    // Priority 1: If user explicitly visits root, show landing page
+    const path = window.location.pathname;
+    if (path === "/" || path === "") {
+      return "landing";
+    }
+
+    // Priority 2: If URL matches a valid step, use it (handles page refreshes)
+    const stepFromPath = path.substring(1) as AppStep;
+    const validSteps: AppStep[] = [
+      "landing",
+      "auth",
+      "chat",
+      "profile",
+      "matches",
+    ];
+    if (validSteps.includes(stepFromPath)) {
+      return stepFromPath;
+    }
+
+    // Priority 3: Fallback to localStorage (only if URL is generic/unknown)
     const saved = localStorage.getItem("vibeai_step");
     return (saved as AppStep) || "landing";
   });
