@@ -1,6 +1,6 @@
 const { GoogleGenAI } = require("@google/genai");
 
-const apiKey = "***REMOVED***";
+const apiKey = process.env.API_KEY || "YOUR_API_KEY_HERE";
 const ai = new GoogleGenAI({ apiKey: apiKey });
 
 async function test() {
