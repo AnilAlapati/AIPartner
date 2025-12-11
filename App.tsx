@@ -33,13 +33,16 @@ const App: React.FC = () => {
 
   // Initialize state from localStorage if available
   const [step, setStep] = useState<AppStep>(() => {
-    // Priority 1: If user explicitly visits root, show landing page
+    // ALWAYS respect the URL first - this is the source of truth
     const path = window.location.pathname;
+
+    // If visiting root URL, ALWAYS show landing - clear any stale localStorage
     if (path === "/" || path === "") {
+      localStorage.removeItem("vibeai_step");
       return "landing";
     }
 
-    // Priority 2: If URL matches a valid step, use it (handles page refreshes)
+    // If URL matches a valid step, use it
     const stepFromPath = path.substring(1) as AppStep;
     const validSteps: AppStep[] = [
       "landing",
@@ -52,15 +55,15 @@ const App: React.FC = () => {
       return stepFromPath;
     }
 
-    // Priority 3: Fallback to localStorage (only if URL is generic/unknown)
-    const saved = localStorage.getItem("vibeai_step");
-    return (saved as AppStep) || "landing";
+    // Fallback to landing for unknown URLs
+    return "landing";
   });
 
   // Safety Net: Ensure we are on landing page if URL is root
   // This handles cases where state might be restored unexpectedly
   useEffect(() => {
     if (window.location.pathname === "/" && step !== "landing") {
+      localStorage.removeItem("vibeai_step");
       setStep("landing");
     }
   }, []);
@@ -129,7 +132,10 @@ const App: React.FC = () => {
 
   // Persist state changes
   useEffect(() => {
-    localStorage.setItem("vibeai_step", step);
+    // Don't persist "landing" to localStorage - we want root URL to always show landing
+    if (step !== "landing") {
+      localStorage.setItem("vibeai_step", step);
+    }
   }, [step]);
 
   useEffect(() => {
