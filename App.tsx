@@ -122,9 +122,50 @@ const App: React.FC = () => {
 
   // Update URL based on step (User Request #6)
   useEffect(() => {
-    const path = step === "landing" ? "/" : `/${step}`;
-    window.history.pushState({ step }, "", path);
+    // Only update URL for stable user-facing steps, not transient states
+    const urlSteps: AppStep[] = [
+      "landing",
+      "auth",
+      "chat",
+      "profile",
+      "matches",
+    ];
+    if (urlSteps.includes(step)) {
+      const path = step === "landing" ? "/" : `/${step}`;
+      window.history.replaceState({ step }, "", path);
+    }
   }, [step]);
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && event.state.step) {
+        setStep(event.state.step as AppStep);
+      } else {
+        // If no state, check the URL path
+        const path = window.location.pathname;
+        if (path === "/" || path === "") {
+          setStep("landing");
+        } else {
+          const stepFromPath = path.substring(1) as AppStep;
+          const validSteps: AppStep[] = [
+            "landing",
+            "auth",
+            "chat",
+            "profile",
+            "matches",
+            "analyzing",
+          ];
+          if (validSteps.includes(stepFromPath)) {
+            setStep(stepFromPath);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // Initialize chat when entering chat step
   useEffect(() => {
