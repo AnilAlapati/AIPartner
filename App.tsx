@@ -57,6 +57,14 @@ const App: React.FC = () => {
     return (saved as AppStep) || "landing";
   });
 
+  // Safety Net: Ensure we are on landing page if URL is root
+  // This handles cases where state might be restored unexpectedly
+  useEffect(() => {
+    if (window.location.pathname === "/" && step !== "landing") {
+      setStep("landing");
+    }
+  }, []);
+
   const [chatHistory, setChatHistory] = useState<Message[]>(() => {
     const saved = localStorage.getItem("vibeai_chat");
     return saved ? JSON.parse(saved) : [];
