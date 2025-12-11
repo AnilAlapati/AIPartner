@@ -128,32 +128,40 @@ const App: React.FC = () => {
 
   // Initialize chat when entering chat step
   useEffect(() => {
-    if (step === "chat" && !chatSessionRef.current) {
-      const initChat = async () => {
-        try {
-          chatSessionRef.current = createChatSession();
+    if (step === "chat") {
+      // Safety check: if we have a persona, we shouldn't be in chat
+      if (userPersona) {
+        setStep("profile");
+        return;
+      }
 
-          if (chatHistory.length === 0) {
-            // Use instant hardcoded greeting instead of AI API call
-            const greetings = [
-              "hey! what's your name? and more importantly, what's a moment that changed your life?",
-              "yo what's good. let's start with your name and a quick lore drop about yourself.",
-              "sup! i'm here to get to know the real you. what's your name first?",
-              "hey there! name and a quick story about yourself to start vibing?",
-              "what's up! let's start simple - who are you and what's your vibe?",
-            ];
-            const greeting =
-              greetings[Math.floor(Math.random() * greetings.length)];
+      if (!chatSessionRef.current) {
+        const initChat = async () => {
+          try {
+            chatSessionRef.current = createChatSession();
 
-            setChatHistory([{ role: "model", text: greeting }]);
+            if (chatHistory.length === 0) {
+              // Use instant hardcoded greeting instead of AI API call
+              const greetings = [
+                "hey! what's your name? and more importantly, what's a moment that changed your life?",
+                "yo what's good. let's start with your name and a quick lore drop about yourself.",
+                "sup! i'm here to get to know the real you. what's your name first?",
+                "hey there! name and a quick story about yourself to start vibing?",
+                "what's up! let's start simple - who are you and what's your vibe?",
+              ];
+              const greeting =
+                greetings[Math.floor(Math.random() * greetings.length)];
+
+              setChatHistory([{ role: "model", text: greeting }]);
+            }
+          } catch (error) {
+            console.error("Failed to start chat", error);
           }
-        } catch (error) {
-          console.error("Failed to start chat", error);
-        }
-      };
-      initChat();
+        };
+        initChat();
+      }
     }
-  }, [step]);
+  }, [step, userPersona]);
 
   const handleReset = () => {
     localStorage.removeItem("vibeai_step");
@@ -282,12 +290,31 @@ const App: React.FC = () => {
   };
 
   // Show auth modal when user tries to start chat without being logged in
-  const handleStartVibeCheck = () => {
+  const handleStartVibeCheck = async () => {
     if (!isAuthenticated) {
       setStep("auth");
-    } else {
-      setStep("chat");
+      return;
     }
+
+    // If we already have a persona locally, go to profile
+    if (userPersona) {
+      setStep("profile");
+      return;
+    }
+
+    // Double check server before starting chat (in case local state is out of sync)
+    try {
+      const existingProfile = await getUserProfile();
+      if (existingProfile) {
+        setUserPersona(existingProfile);
+        setStep("profile");
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    setStep("chat");
   };
 
   return (
