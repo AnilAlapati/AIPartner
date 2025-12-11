@@ -57,6 +57,7 @@ Unlike traditional dating apps that rely on superficial swiping, VibeAI engages 
 ### 🛠️ **Technology Stack**
 
 **Frontend:**
+
 - ⚛️ **React 19** - Modern UI framework
 - 🎨 **TypeScript** - Type-safe development
 - 🎭 **Tailwind CSS** - Utility-first styling
@@ -64,6 +65,7 @@ Unlike traditional dating apps that rely on superficial swiping, VibeAI engages 
 - 📊 **Google Analytics 4** - User analytics
 
 **Backend:**
+
 - 🔥 **Firebase Functions** - Serverless API
 - 🤖 **Google Gemini 3 Pro** - AI reasoning engine
 - 🗄️ **Firestore** - NoSQL database
@@ -91,6 +93,7 @@ npm install
 ### **2. Environment Setup**
 
 #### **Frontend Environment (.env.local)**
+
 ```bash
 # Copy the example file
 cp .env.example .env.local
@@ -100,6 +103,7 @@ VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 ```
 
 #### **Backend Environment (functions/.env)**
+
 ```bash
 # Navigate to functions directory
 cd functions
@@ -115,11 +119,13 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ### **3. Get API Keys**
 
 #### **Gemini API Key**
+
 1. Go to [Google AI Studio](https://ai.google.dev/)
 2. Create a new API key
 3. Copy the key to both `.env.local` and `functions/.env`
 
 #### **Google Analytics (Optional)**
+
 1. Go to [Google Analytics](https://analytics.google.com/)
 2. Create a GA4 property
 3. Copy the Measurement ID to `.env.local`
@@ -184,18 +190,22 @@ firebase deploy
 ## 🎮 **How It Works**
 
 ### **1. User Onboarding**
+
 - Users authenticate with Google
 - AI checks for existing profiles to prevent abuse
 
 ### **2. Personality Analysis**
+
 - 5-question conversation with Gemini AI
 - Advanced reasoning extracts personality traits, values, and preferences
 
 ### **3. Smart Matching**
+
 - Compatibility algorithm analyzes 500+ AI-generated profiles
 - Matches based on emotional intelligence, humor, values, and communication style
 
 ### **4. Results Display**
+
 - Top matches presented with detailed compatibility scores
 - Users can explore matches and start conversations
 
@@ -293,6 +303,6 @@ See [`DEPLOY.md`](./DEPLOY.md) for detailed deployment instructions.
 
 ---
 
-*Transforming dating from superficial swipes to meaningful connections*
+_Transforming dating from superficial swipes to meaningful connections_
 
 </div>
